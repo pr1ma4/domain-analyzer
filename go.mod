@@ -1,6 +1,6 @@
 module domain-analyzer
 
-go 1.26.1
+go 1.21
 
 require (
 	github.com/likexian/whois v1.15.7
