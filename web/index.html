@@ -1,0 +1,1718 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DNS Tracker - WHOIS + DNS + Server Info</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        :root {
+            --bg-primary: #f0f2f5;
+            --bg-secondary: #ffffff;
+            --bg-card: #ffffff;
+            --bg-hover: #f5f5f5;
+            --text-primary: #333333;
+            --text-secondary: #666666;
+            --text-muted: #555555;
+            --border-color: #e0e0e0;
+            --border-light: #f0f0f0;
+            --header-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --code-bg: #f5f5f5;
+            --raw-bg: #f8f9fa;
+            --toggle-bg: #e8f0fe;
+            --toggle-hover: #d0e0f0;
+            --ns-tag-bg: #e8f0fe;
+            --ns-tag-color: #0066cc;
+            --status-bg: #e8f5e9;
+            --status-color: #4caf50;
+            --error-bg: #ffebee;
+            --error-color: #d32f2f;
+            --tooltip-bg: #333;
+            --tooltip-color: #fff;
+            --shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        body.dark {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #0d1117;
+            --bg-card: #161b22;
+            --bg-hover: #1f242f;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --text-muted: #6e7681;
+            --border-color: #21262d;
+            --border-light: #1a1f2a;
+            --header-gradient: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
+            --code-bg: #0d1117;
+            --raw-bg: #0d1117;
+            --toggle-bg: #21262d;
+            --toggle-hover: #30363d;
+            --ns-tag-bg: #21262d;
+            --ns-tag-color: #58a6ff;
+            --status-bg: #1a3a2a;
+            --status-color: #7ee787;
+            --error-bg: #3a1a1a;
+            --error-color: #f85149;
+            --tooltip-bg: #1f242f;
+            --tooltip-color: #e6edf3;
+            --shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+        
+        * { box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; 
+            max-width: 1400px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: var(--bg-primary);
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+        
+        .container {
+            position: relative;
+            z-index: 1;
+            background: var(--bg-secondary);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: var(--shadow);
+            transition: background 0.3s ease;
+        }
+        
+        body.dark .container {
+            background: rgba(13, 17, 23, 0.95);
+            border: 1px solid rgba(88, 166, 255, 0.15);
+        }
+        
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        h1 { 
+            color: #0066cc; 
+            margin: 0; 
+            font-size: 28px;
+            transition: color 0.3s ease;
+        }
+        
+        body.dark h1 {
+            color: #58a6ff;
+        }
+        
+        .visitor-info {
+            background: var(--toggle-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 40px;
+            padding: 6px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            color: var(--text-primary);
+            position: relative;
+        }
+        
+        .visitor-info:hover {
+            background: var(--toggle-hover);
+            border-color: var(--ns-tag-color);
+        }
+        
+        .visitor-ip {
+            font-family: monospace;
+            font-weight: 600;
+            color: var(--ns-tag-color);
+        }
+        
+        .visitor-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .visitor-modal.active {
+            display: flex;
+        }
+        
+        .visitor-modal-content {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 400px;
+            width: 90%;
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow);
+            position: relative;
+        }
+        
+        body.dark .visitor-modal-content {
+            background: var(--bg-card);
+        }
+        
+        .visitor-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .visitor-modal-header h3 {
+            margin: 0;
+            color: var(--ns-tag-color);
+        }
+        
+        .visitor-modal-close {
+            cursor: pointer;
+            font-size: 24px;
+            color: var(--text-muted);
+            transition: color 0.2s;
+        }
+        
+        .visitor-modal-close:hover {
+            color: var(--error-color);
+        }
+        
+        .visitor-detail-row {
+            display: flex;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-light);
+        }
+        
+        .visitor-detail-label {
+            width: 100px;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+        
+        .visitor-detail-value {
+            flex: 1;
+            color: var(--text-primary);
+            word-break: break-word;
+        }
+        
+        .visitor-loading {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-muted);
+        }
+        
+        .theme-toggle {
+            background: var(--toggle-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 40px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            color: var(--text-primary);
+        }
+        
+        .theme-toggle:hover {
+            background: var(--toggle-hover);
+            transform: scale(1.02);
+            border-color: var(--ns-tag-color);
+        }
+        
+        .theme-icon {
+            font-size: 16px;
+        }
+        
+        .sub { 
+            color: var(--text-secondary); 
+            margin-bottom: 25px; 
+            padding-bottom: 0; 
+        }
+        
+        .main-search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .dns-search-box {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            padding: 15px;
+            background: var(--toggle-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .dns-search-box input {
+            flex: 2;
+            padding: 10px;
+            font-size: 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-card);
+            color: var(--text-primary);
+        }
+        
+        .dns-search-box button {
+            padding: 10px 20px;
+            font-size: 14px;
+        }
+        
+        .dns-search-label {
+            font-weight: 600;
+            color: var(--ns-tag-color);
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+        
+        input { 
+            flex: 2;
+            padding: 14px; 
+            font-size: 16px; 
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            font-family: monospace;
+            background: var(--bg-card);
+            color: var(--text-primary);
+            transition: all 0.3s ease;
+        }
+        
+        input:focus { 
+            outline: none; 
+            border-color: #0066cc;
+            box-shadow: 0 0 0 3px rgba(0,102,204,0.1);
+        }
+        
+        body.dark input:focus {
+            border-color: #58a6ff;
+            box-shadow: 0 0 0 3px rgba(88,166,255,0.1);
+        }
+        
+        input::placeholder { color: var(--text-muted); }
+        
+        button { 
+            padding: 14px 28px; 
+            font-size: 16px; 
+            cursor: pointer; 
+            background: #0066cc; 
+            color: white; 
+            border: none; 
+            border-radius: 12px;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        
+        button:hover { 
+            background: #0052a3;
+            transform: translateY(-1px);
+        }
+        
+        body.dark button {
+            background: #1f6feb;
+        }
+        
+        body.dark button:hover {
+            background: #388bfd;
+        }
+        
+        .section {
+            margin-bottom: 40px;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .section-header {
+            background: var(--header-gradient);
+            padding: 15px 20px;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.2s;
+        }
+        
+        .section-header:hover {
+            filter: brightness(1.05);
+        }
+        
+        .section-header .toggle-icon {
+            font-size: 20px;
+            transition: transform 0.3s ease;
+        }
+        
+        .section-header .toggle-icon.collapsed {
+            transform: rotate(-90deg);
+        }
+        
+        .section-content {
+            padding: 20px;
+            background: var(--bg-card);
+            transition: max-height 0.3s ease, opacity 0.2s ease, padding 0.2s ease;
+            max-height: 5000px;
+            opacity: 1;
+            overflow: hidden;
+        }
+        
+        .section-content.collapsed {
+            max-height: 0;
+            opacity: 0;
+            padding: 0 20px;
+        }
+        
+        .server-info-grid {
+            display: grid;
+            grid-template-columns: 1fr 450px;
+            gap: 20px;
+            align-items: start;
+        }
+        
+        .server-info-details {
+            flex: 1;
+        }
+        
+        .server-map-container {
+            width: 450px;
+        }
+        
+        .server-map {
+            height: 300px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            background: #1a1a2e;
+        }
+        
+        .leaflet-control-attribution {
+            display: none !important;
+        }
+        
+        .whois-group {
+            margin-bottom: 25px;
+        }
+        
+        .whois-group-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #0066cc;
+            border-bottom: 2px solid #0066cc;
+            padding-bottom: 8px;
+            margin-bottom: 15px;
+        }
+        
+        body.dark .whois-group-title {
+            color: #58a6ff;
+            border-bottom-color: #58a6ff;
+        }
+        
+        .whois-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .whois-row {
+            display: flex;
+            align-items: flex-start;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-light);
+        }
+        
+        .whois-label {
+            width: 140px;
+            font-weight: 600;
+            color: var(--text-muted);
+            font-size: 13px;
+            flex-shrink: 0;
+            position: relative;
+            cursor: help;
+            border-bottom: 1px dashed var(--border-color);
+        }
+        
+        .whois-label:hover {
+            color: #0066cc;
+        }
+        
+        body.dark .whois-label:hover {
+            color: #58a6ff;
+        }
+        
+        .whois-label:hover::after {
+            content: attr(data-tip);
+            position: absolute;
+            left: 0;
+            top: 100%;
+            background: var(--tooltip-bg);
+            color: var(--tooltip-color);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: normal;
+            white-space: nowrap;
+            z-index: 1000;
+            margin-top: 5px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-color);
+        }
+        
+        .whois-value {
+            flex: 1;
+            color: var(--text-primary);
+            font-size: 14px;
+            word-break: break-word;
+        }
+        
+        .ns-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        
+        .ns-tag {
+            background: var(--ns-tag-bg);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-family: monospace;
+            font-size: 12px;
+            color: var(--ns-tag-color);
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            margin: 2px;
+            background: var(--status-bg);
+            color: var(--status-color);
+        }
+        
+        .raw-data-container {
+            position: relative;
+        }
+        
+        .raw-data {
+            background: var(--raw-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 15px;
+            border-radius: 12px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            line-height: 1.5;
+            max-height: 150px;
+            overflow-y: hidden;
+            transition: max-height 0.4s ease, filter 0.3s ease;
+            filter: blur(4px);
+            cursor: pointer;
+        }
+        
+        .raw-data.expanded {
+            max-height: none;
+            filter: blur(0);
+        }
+        
+        .raw-data:not(.expanded):hover {
+            filter: blur(2px);
+        }
+        
+        .raw-data-toggle {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+            padding: 8px;
+            background: var(--toggle-bg);
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 13px;
+            color: var(--ns-tag-color);
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .raw-data-toggle:hover {
+            background: var(--toggle-hover);
+        }
+        
+        .raw-data-toggle .arrow {
+            transition: transform 0.3s ease;
+            font-size: 16px;
+        }
+        
+        .raw-data-toggle .arrow.rotated {
+            transform: rotate(180deg);
+        }
+        
+        .blur-hint {
+            position: absolute;
+            bottom: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,102,204,0.9);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            pointer-events: none;
+            white-space: nowrap;
+            z-index: 10;
+            transition: opacity 0.3s;
+        }
+        
+        .raw-data.expanded ~ .blur-hint {
+            opacity: 0;
+        }
+        
+        .ns-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .ns-item {
+            background: var(--raw-bg);
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .ns-server {
+            font-weight: bold;
+            font-family: monospace;
+            font-size: 14px;
+            color: var(--ns-tag-color);
+        }
+        
+        .record-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        
+        .record-btn {
+            padding: 8px 16px;
+            background: var(--toggle-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+            color: var(--text-primary);
+        }
+        
+        .record-btn.active {
+            background: #0066cc;
+            color: white;
+            border-color: #0066cc;
+        }
+        
+        .record-btn:hover { 
+            background: var(--toggle-hover);
+            transform: translateY(-1px);
+        }
+        
+        body.dark .record-btn.active {
+            background: #1f6feb;
+            border-color: #1f6feb;
+        }
+        
+        .dns-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        
+        .dns-table th, .dns-table td {
+            padding: 10px 8px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+        
+        .dns-table th {
+            background: var(--toggle-bg);
+            font-weight: bold;
+            color: var(--ns-tag-color);
+            position: sticky;
+            top: 0;
+        }
+        
+        .dns-table tr:hover { 
+            background: var(--bg-hover); 
+        }
+        
+        .dns-table td:first-child {
+            font-weight: 600;
+            color: #0066cc;
+        }
+        
+        body.dark .dns-table td:first-child {
+            color: #58a6ff;
+        }
+        
+        .dns-table td:nth-child(2) {
+            color: var(--text-secondary);
+        }
+        
+        .dns-table code {
+            background: var(--code-bg);
+            padding: 2px 6px;
+            border-radius: 6px;
+            font-size: 12px;
+            color: var(--text-primary);
+        }
+        
+        .flag-icon {
+            display: inline-block;
+            width: 20px;
+            height: 15px;
+            margin-right: 6px;
+            vertical-align: middle;
+            background-size: cover;
+            background-repeat: no-repeat;
+        }
+        
+        .error-cell {
+            position: relative;
+            cursor: help;
+        }
+        
+        .error-cell .error-tooltip {
+            visibility: hidden;
+            background-color: var(--tooltip-bg);
+            color: var(--tooltip-color);
+            text-align: left;
+            border-radius: 8px;
+            padding: 8px 12px;
+            position: absolute;
+            z-index: 1000;
+            bottom: 125%;
+            left: 0;
+            width: 250px;
+            font-size: 12px;
+            font-weight: normal;
+            line-height: 1.4;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-color);
+        }
+        
+        .error-cell:hover .error-tooltip {
+            visibility: visible;
+            opacity: 1;
+        }
+        
+        .error-tooltip::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 20px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: var(--tooltip-bg) transparent transparent transparent;
+        }
+        
+        .error-timeout { color: #ff9800; }
+        .error-norecord { color: #ff9800; }
+        .error-noresponse { color: #f44336; }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+        
+        .error {
+            color: var(--error-color);
+            background: var(--error-bg);
+            padding: 15px;
+            border-radius: 12px;
+        }
+        
+        .response-time {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: monospace;
+            font-weight: 500;
+        }
+        
+        .response-time.fast { color: #4caf50; }
+        .response-time.medium { color: #ff9800; }
+        .response-time.slow { color: #f44336; }
+        
+        body.dark .response-time.fast { color: #7ee787; }
+        body.dark .response-time.medium { color: #ff9800; }
+        body.dark .response-time.slow { color: #f85149; }
+        
+        .http-status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .http-2xx { background: #e8f5e9; color: #4caf50; }
+        .http-3xx { background: #e3f2fd; color: #2196f3; }
+        .http-4xx { background: #fff3e0; color: #ff9800; }
+        .http-5xx { background: #ffebee; color: #f44336; }
+        body.dark .http-2xx { background: #1b5e20; color: #81c784; }
+        body.dark .http-3xx { background: #0d47a1; color: #64b5f6; }
+        body.dark .http-4xx { background: #e65100; color: #ffb74d; }
+        body.dark .http-5xx { background: #b71c1c; color: #ef5350; }
+        
+        @media (max-width: 768px) {
+            .whois-row {
+                flex-direction: column;
+            }
+            .whois-label {
+                width: 100%;
+                margin-bottom: 5px;
+            }
+            .dns-table { font-size: 10px; }
+            .dns-table th, .dns-table td { padding: 6px 4px; }
+            .error-cell .error-tooltip { width: 180px; font-size: 10px; }
+            .header-row {
+                flex-direction: column;
+                gap: 15px;
+                align-items: flex-start;
+            }
+            .server-info-grid {
+                grid-template-columns: 1fr;
+            }
+            .server-map-container {
+                width: 100%;
+            }
+            .server-map {
+                height: 250px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-row">
+            <div class="header-left">
+                <h1>🌍 DNS Tracker</h1>
+                <div class="visitor-info" onclick="showVisitorModal()">
+                    <span>🌐</span>
+                    <span class="visitor-ip" id="visitor-ip">Загрузка...</span>
+                    <span>▼</span>
+                </div>
+            </div>
+            <button class="theme-toggle" onclick="toggleTheme()">
+                <span class="theme-icon">🌙</span>
+                <span>Темная тема</span>
+            </button>
+        </div>
+        <div class="sub">WHOIS информация • DNS проверка (27+ серверов по всему миру) • Информация о сервере</div>
+        
+        <div class="main-search-box">
+            <input type="text" id="domain" placeholder="Введите домен (например, google.com, yandex.ru, яндекс.рф)" value="google.com">
+            <button onclick="analyzeDomain()">Проверить</button>
+        </div>
+        
+        <div id="content">
+            <div class="loading">✨ Введите домен и нажмите "Проверить"</div>
+        </div>
+    </div>
+    
+    <div id="visitor-modal" class="visitor-modal" onclick="closeVisitorModal(event)">
+        <div class="visitor-modal-content" onclick="event.stopPropagation()">
+            <div class="visitor-modal-header">
+                <h3>📡 Информация о вас</h3>
+                <span class="visitor-modal-close" onclick="closeVisitorModal()">&times;</span>
+            </div>
+            <div id="visitor-details">
+                <div class="visitor-loading">Загрузка информации...</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentDomain = '';
+        let currentData = null;
+        let currentMap = null;
+        let visitorData = null;
+        
+        // Функция для преобразования кириллицы в punycode
+        function toPunycode(domain) {
+            if (!domain) return domain;
+            try {
+                if (domain.match(/[а-яё]/i)) {
+                    return new URL(`https://${domain}`).hostname;
+                }
+                return domain;
+            } catch(e) {
+                return domain;
+            }
+        }
+        
+        // Функция получения кода страны из названия
+        function getCountryCode(countryName) {
+            if (!countryName) return null;
+            const map = {
+                'Russia': 'ru', 'Russian Federation': 'ru', 'USA': 'us', 'United States': 'us',
+                'United Kingdom': 'gb', 'Germany': 'de', 'France': 'fr', 'Netherlands': 'nl',
+                'Turkey': 'tr', 'China': 'cn', 'India': 'in', 'Pakistan': 'pk', 'South Korea': 'kr',
+                'Australia': 'au', 'Brazil': 'br', 'South Africa': 'za', 'Mexico': 'mx', 'Japan': 'jp',
+                'Italy': 'it', 'Spain': 'es', 'Canada': 'ca', 'Poland': 'pl', 'Ukraine': 'ua',
+                'Kazakhstan': 'kz', 'Belarus': 'by', 'Finland': 'fi', 'Sweden': 'se', 'Norway': 'no',
+                'Denmark': 'dk', 'Switzerland': 'ch', 'Belgium': 'be', 'Austria': 'at', 'Greece': 'gr',
+                'Portugal': 'pt', 'Israel': 'il', 'UAE': 'ae', 'Singapore': 'sg'
+            };
+            if (map[countryName]) return map[countryName];
+            return countryName.substring(0, 2).toLowerCase();
+        }
+        
+        // Функция получения HTML флага
+        function getFlagHtml(countryName) {
+            if (!countryName) return '';
+            const code = getCountryCode(countryName);
+            if (!code) return '';
+            return `<span class="flag-icon" style="background-image: url('https://flagcdn.com/20x15/${code}.png');"></span>`;
+        }
+        
+        // Получение информации о посетителе через JSONP
+        function getVisitorInfo() {
+            const script = document.createElement('script');
+            const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
+            
+            window[callbackName] = function(data) {
+                delete window[callbackName];
+                document.body.removeChild(script);
+                
+                if (data && data.ip) {
+                    visitorData = {
+                        ip: data.ip,
+                        country: data.country,
+                        region: data.region,
+                        city: data.city,
+                        org: data.org,
+                        countryCode: data.country?.toLowerCase()
+                    };
+                    document.getElementById('visitor-ip').textContent = visitorData.ip;
+                } else {
+                    getIPOnly();
+                }
+            };
+            
+            script.src = `https://ipinfo.io/json?callback=${callbackName}`;
+            script.onerror = function() {
+                delete window[callbackName];
+                document.body.removeChild(script);
+                getIPOnly();
+            };
+            document.body.appendChild(script);
+        }
+        
+        // Запасной вариант - только IP
+        function getIPOnly() {
+            const script2 = document.createElement('script');
+            const callbackName2 = 'jsonp_ip_callback_' + Math.round(100000 * Math.random());
+            
+            window[callbackName2] = function(data) {
+                delete window[callbackName2];
+                document.body.removeChild(script2);
+                visitorData = { ip: data.ip };
+                document.getElementById('visitor-ip').textContent = visitorData.ip;
+            };
+            
+            script2.src = `https://api.ipify.org?format=jsonp&callback=${callbackName2}`;
+            script2.onerror = function() {
+                delete window[callbackName2];
+                document.body.removeChild(script2);
+                document.getElementById('visitor-ip').textContent = 'Не определен';
+                visitorData = null;
+            };
+            document.body.appendChild(script2);
+        }
+        
+        function showVisitorModal() {
+            const modal = document.getElementById('visitor-modal');
+            const detailsDiv = document.getElementById('visitor-details');
+            
+            if (!visitorData) {
+                detailsDiv.innerHTML = '<div class="visitor-loading">Загрузка информации...</div>';
+                modal.classList.add('active');
+                const checkInterval = setInterval(() => {
+                    if (visitorData) {
+                        clearInterval(checkInterval);
+                        renderVisitorDetails();
+                    }
+                }, 100);
+                setTimeout(() => clearInterval(checkInterval), 5000);
+            } else {
+                renderVisitorDetails();
+                modal.classList.add('active');
+            }
+        }
+        
+        function renderVisitorDetails() {
+            const detailsDiv = document.getElementById('visitor-details');
+            if (!visitorData) {
+                detailsDiv.innerHTML = '<div class="visitor-loading">Не удалось загрузить информацию</div>';
+                return;
+            }
+            
+            const userAgent = navigator.userAgent;
+            let browser = 'Неизвестно';
+            let os = 'Неизвестно';
+            
+            if (userAgent.indexOf('Chrome') > -1 && userAgent.indexOf('Edg') === -1) browser = 'Chrome';
+            else if (userAgent.indexOf('Firefox') > -1) browser = 'Firefox';
+            else if (userAgent.indexOf('Safari') > -1 && userAgent.indexOf('Chrome') === -1) browser = 'Safari';
+            else if (userAgent.indexOf('Edg') > -1) browser = 'Edge';
+            else if (userAgent.indexOf('Opera') > -1 || userAgent.indexOf('OPR') > -1) browser = 'Opera';
+            
+            if (userAgent.indexOf('Windows NT 10.0') > -1) os = 'Windows 10';
+            else if (userAgent.indexOf('Windows NT 11.0') > -1) os = 'Windows 11';
+            else if (userAgent.indexOf('Windows NT 6.1') > -1) os = 'Windows 7';
+            else if (userAgent.indexOf('Mac OS X') > -1) os = 'macOS';
+            else if (userAgent.indexOf('Linux') > -1 && userAgent.indexOf('Android') === -1) os = 'Linux';
+            else if (userAgent.indexOf('Android') > -1) os = 'Android';
+            else if (userAgent.indexOf('iPhone') > -1 || userAgent.indexOf('iPad') > -1) os = 'iOS';
+            
+            const screenSize = `${window.screen.width}×${window.screen.height}`;
+            const language = navigator.language;
+            const flagHtml = visitorData.country ? getFlagHtml(visitorData.country) : '';
+            
+            detailsDiv.innerHTML = `
+                <div class="visitor-detail-row">
+                    <div class="visitor-detail-label">IP адрес:</div>
+                    <div class="visitor-detail-value"><code>${visitorData.ip || '—'}</code></div>
+                </div>
+                <div class="visitor-detail-row">
+                    <div class="visitor-detail-label">Страна:</div>
+                    <div class="visitor-detail-value">${flagHtml} ${visitorData.country || '—'}</div>
+                </div>
+                <div class="visitor-detail-row">
+                    <div class="visitor-detail-label">Регион:</div>
+                    <div class="visitor-detail-value">${visitorData.region || '—'}</div>
+                </div>
+                <div class="visitor-detail-row">
+                    <div class="visitor-detail-label">Город:</div>
+                    <div class="visitor-detail-value">${visitorData.city || '—'}</div>
+                </div>
+                <div class="visitor-detail-row">
+                    <div class="visitor-detail-label">Провайдер:</div>
+                    <div class="visitor-detail-value">${visitorData.org || '—'}</div>
+                </div>
+                <div class="visitor-detail-row">
+                    <div class="visitor-detail-label">Браузер:</div>
+                    <div class="visitor-detail-value">${browser}</div>
+                </div>
+                <div class="visitor-detail-row">
+                    <div class="visitor-detail-label">ОС:</div>
+                    <div class="visitor-detail-value">${os}</div>
+                </div>
+                <div class="visitor-detail-row">
+                    <div class="visitor-detail-label">Экран:</div>
+                    <div class="visitor-detail-value">${screenSize}</div>
+                </div>
+                <div class="visitor-detail-row">
+                    <div class="visitor-detail-label">Язык:</div>
+                    <div class="visitor-detail-value">${language}</div>
+                </div>
+            `;
+        }
+        
+        function closeVisitorModal(event) {
+            const modal = document.getElementById('visitor-modal');
+            modal.classList.remove('active');
+        }
+        
+        function toggleTheme() {
+            const body = document.body;
+            const themeToggle = document.querySelector('.theme-toggle');
+            const themeIcon = themeToggle.querySelector('.theme-icon');
+            const themeText = themeToggle.querySelector('span:last-child');
+            
+            if (body.classList.contains('dark')) {
+                body.classList.remove('dark');
+                themeIcon.textContent = '🌙';
+                themeText.textContent = 'Темная тема';
+                localStorage.setItem('theme', 'light');
+            } else {
+                body.classList.add('dark');
+                themeIcon.textContent = '☀️';
+                themeText.textContent = 'Светлая тема';
+                localStorage.setItem('theme', 'dark');
+            }
+        }
+        
+        function loadTheme() {
+            const savedTheme = localStorage.getItem('theme');
+            const body = document.body;
+            const themeToggle = document.querySelector('.theme-toggle');
+            
+            if (savedTheme === 'dark') {
+                body.classList.add('dark');
+                if (themeToggle) {
+                    themeToggle.querySelector('.theme-icon').textContent = '☀️';
+                    themeToggle.querySelector('span:last-child').textContent = 'Светлая тема';
+                }
+            }
+        }
+        
+function initMap(lat, lon, city, country) {
+    const mapContainer = document.getElementById('server-map');
+    if (!mapContainer) return;
+    
+    if (currentMap) {
+        currentMap.remove();
+    }
+    
+    // Координаты по умолчанию (Москва, если нет данных)
+    let latitude = lat || 55.7558;
+    let longitude = lon || 37.6173;
+    
+    // Если координаты 0,0 - ставим Москву
+    if (latitude === 0 && longitude === 0) {
+        latitude = 55.7558;
+        longitude = 37.6173;
+    }
+    
+    currentMap = L.map('server-map').setView([latitude, longitude], 5);
+    
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '',
+        subdomains: 'abcd',
+        maxZoom: 19
+    }).addTo(currentMap);
+    
+    const marker = L.marker([latitude, longitude], {
+        icon: L.divIcon({
+            className: 'custom-marker',
+            html: '📍',
+            iconSize: [24, 24],
+            popupAnchor: [0, -12]
+        })
+    }).addTo(currentMap);
+    
+    let popupText = '';
+    if (city && country) popupText = `${city}, ${country}`;
+    else if (country) popupText = country;
+    else popupText = currentDomain;
+    
+    marker.bindPopup(popupText).openPopup();
+}
+        
+        function getHttpStatusClass(status) {
+            if (status >= 200 && status < 300) return 'http-2xx';
+            if (status >= 300 && status < 400) return 'http-3xx';
+            if (status >= 400 && status < 500) return 'http-4xx';
+            if (status >= 500 && status < 600) return 'http-5xx';
+            return '';
+        }
+        
+        function toggleSection(sectionId) {
+            const content = document.getElementById(sectionId + '-content');
+            const icon = document.getElementById(sectionId + '-icon');
+            if (content.classList.contains('collapsed')) {
+                content.classList.remove('collapsed');
+                icon.classList.remove('collapsed');
+            } else {
+                content.classList.add('collapsed');
+                icon.classList.add('collapsed');
+            }
+        }
+        
+        async function analyzeDomain() {
+            const domain = document.getElementById('domain').value.trim();
+            if (!domain) {
+                alert('Введите домен');
+                return;
+            }
+            
+            currentDomain = domain;
+            
+            const contentDiv = document.getElementById('content');
+            contentDiv.innerHTML = '<div class="loading">⏳ Загрузка данных...</div>';
+            
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({domain: domain, record_type: 'NS'})
+                });
+                
+                if (!response.ok) throw new Error('Ошибка сервера');
+                
+                currentData = await response.json();
+                renderAll();
+                
+                // Автоматически запускаем NS проверку
+                const nsButton = document.querySelector('.record-btn[data-type="NS"]');
+                if (nsButton) {
+                    nsButton.classList.add('active');
+                    checkDNSRecord('NS');
+                }
+                
+            } catch (error) {
+                contentDiv.innerHTML = `<div class="error">❌ ${error.message}</div>`;
+            }
+        }
+        
+        // Отдельная функция для DNS проверки по введенному домену
+        async function checkDNSSeparate() {
+            let domain = document.getElementById('dns-check-domain').value.trim();
+            if (!domain) {
+                alert('Введите домен для DNS проверки');
+                return;
+            }
+            
+            // Конвертируем кириллицу в punycode
+            try {
+                if (domain.match(/[а-яё]/i)) {
+                    const punycode = new URL(`https://${domain}`).hostname;
+                    domain = punycode;
+                }
+            } catch(e) {}
+            
+            const resultsDiv = document.getElementById('dns-check-results');
+            resultsDiv.innerHTML = '<div class="loading">⏳ Проверка DNS записей...</div>';
+            
+            // Получаем активный тип записи
+            const activeBtn = document.querySelector('.record-btn.active');
+            const recordType = activeBtn ? activeBtn.dataset.type : 'A';
+            
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({domain: domain, record_type: recordType})
+                });
+                
+                if (!response.ok) throw new Error('Ошибка сервера');
+                
+                const data = await response.json();
+                
+                if (!data.dns || !data.dns.checks || !data.dns.checks[recordType] || data.dns.checks[recordType].length === 0) {
+                    resultsDiv.innerHTML = '<div class="error">Нет данных от DNS серверов.</div>';
+                    return;
+                }
+                
+                const checks = data.dns.checks[recordType];
+                
+                let tableHtml = `
+                    <table class="dns-table">
+                        <thead>
+                            <tr>
+                                <th>DNS Server</th>
+                                <th>Location</th>
+                                <th>Result</th>
+                                <th>Time (ms)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                
+                checks.forEach(check => {
+                    let result = '';
+                    let errorClass = '';
+                    
+                    if (check.error) {
+                        const tooltip = getTooltipForError(check.error);
+                        if (check.error === "Timeout") {
+                            errorClass = 'error-timeout';
+                            result = `<span class="error-cell ${errorClass}" style="cursor: help;">⚠️ Timeout<span class="error-tooltip">${tooltip.replace(/\n/g, '<br>')}</span></span>`;
+                        } else if (check.error === "No response") {
+                            errorClass = 'error-noresponse';
+                            result = `<span class="error-cell ${errorClass}" style="cursor: help;">❌ No response<span class="error-tooltip">${tooltip.replace(/\n/g, '<br>')}</span></span>`;
+                        } else {
+                            errorClass = 'error-norecord';
+                            result = `<span class="error-cell ${errorClass}" style="cursor: help;">⚠️ ${check.error}<span class="error-tooltip">${tooltip.replace(/\n/g, '<br>')}</span></span>`;
+                        }
+                    } else if (check.records.length === 0) {
+                        const tooltip = getTooltipForError("No records");
+                        result = `<span class="error-cell error-norecord" style="cursor: help;">⚠️ No records<span class="error-tooltip">${tooltip.replace(/\n/g, '<br>')}</span></span>`;
+                    } else {
+                        result = check.records.map(r => `<code>${escapeHtml(r)}</code>`).join('<br>');
+                    }
+                    
+                    const timeClass = getTimeClass(check.response_time);
+                    const timeDisplay = check.response_time > 0 ? check.response_time : '—';
+                    const locationParts = check.country.split(',');
+                    const country = locationParts.length > 1 ? locationParts[1].trim() : check.country;
+                    const flagHtml = getFlagHtml(country);
+                    
+                    tableHtml += `
+                        <tr>
+                            <td><strong>${escapeHtml(check.dns_server)}</strong>${flagHtml ? `<span style="margin-left: 6px;">${flagHtml}</span>` : ''}</td>
+                            <td>${escapeHtml(check.country)}</span></td>
+                            <td>${result}</span></td>
+                            <td class="response-time ${timeClass}">${timeDisplay}ms</span></td>
+                        </tr>
+                    `;
+                });
+                
+                tableHtml += `</tbody></table>`;
+                resultsDiv.innerHTML = tableHtml;
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">❌ ${error.message}</div>`;
+            }
+        }
+        
+        function renderAll() {
+            let html = '';
+            html += renderWhois();
+            html += renderDNS();
+            html += renderServerInfo();
+            
+            document.getElementById('content').innerHTML = html;
+            
+            // Инициализация раскрывающихся блоков Raw Data
+            document.querySelectorAll('.raw-data-container').forEach(container => {
+                const rawData = container.querySelector('.raw-data');
+                const toggle = container.querySelector('.raw-data-toggle');
+                const arrow = toggle.querySelector('.arrow');
+                
+                toggle.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    rawData.classList.toggle('expanded');
+                    arrow.classList.toggle('rotated');
+                });
+                
+                rawData.addEventListener('click', function() {
+                    if (!rawData.classList.contains('expanded')) {
+                        rawData.classList.add('expanded');
+                        arrow.classList.add('rotated');
+                    }
+                });
+            });
+            
+            // Привязываем обработчики для кнопок DNS
+            document.querySelectorAll('.record-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.record-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    const recordType = this.dataset.type;
+                    // Обновляем проверку с текущим доменом из поля DNS проверки
+                    const dnsDomain = document.getElementById('dns-check-domain').value.trim();
+                    if (dnsDomain) {
+                        checkDNSSeparate();
+                    } else {
+                        checkDNSRecord(recordType);
+                    }
+                });
+            });
+            
+            const server = currentData.server;
+            if (server && server.lat && server.lon) {
+                setTimeout(() => {
+                    initMap(server.lat, server.lon, server.city, server.country);
+                }, 100);
+            }
+        }
+        
+        function renderWhois() {
+            const whois = currentData.whois;
+            const error = currentData.whois_error;
+            
+            if (error || !whois) {
+                return `
+                    <div class="section">
+                        <div class="section-header" onclick="toggleSection('whois')">
+                            <span>📋 WHOIS информация</span>
+                            <span class="toggle-icon collapsed" id="whois-icon">▼</span>
+                        </div>
+                        <div class="section-content collapsed" id="whois-content">
+                            <div class="error">${error || 'Нет данных'}</div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            return `
+                <div class="section">
+                    <div class="section-header" onclick="toggleSection('whois')">
+                        <span>📋 WHOIS информация</span>
+                        <span class="toggle-icon collapsed" id="whois-icon">▼</span>
+                    </div>
+                    <div class="section-content collapsed" id="whois-content">
+                        <div class="whois-group">
+                            <div class="whois-group-title">Domain Information</div>
+                            <div class="whois-list">
+                                <div class="whois-row">
+                                    <div class="whois-label" data-tip="Имя домена">Domain:</div>
+                                    <div class="whois-value"><strong>${whois.domain || currentDomain}</strong></div>
+                                </div>
+                                <div class="whois-row">
+                                    <div class="whois-label" data-tip="Компания-регистратор домена">Registrar:</div>
+                                    <div class="whois-value">${whois.registrar || '—'}</div>
+                                </div>
+                                <div class="whois-row">
+                                    <div class="whois-label" data-tip="Дата регистрации домена">Registered On:</div>
+                                    <div class="whois-value">${whois.creation_date || '—'}</div>
+                                </div>
+                                <div class="whois-row">
+                                    <div class="whois-label" data-tip="Дата истечения домена">Expires On:</div>
+                                    <div class="whois-value">${whois.expiration_date || '—'}</div>
+                                </div>
+                                ${whois.updated_date ? `
+                                <div class="whois-row">
+                                    <div class="whois-label" data-tip="Дата последнего обновления WHOIS">Updated On:</div>
+                                    <div class="whois-value">${whois.updated_date}</div>
+                                </div>
+                                ` : ''}
+                                ${whois.statuses && whois.statuses.length ? `
+                                <div class="whois-row">
+                                    <div class="whois-label" data-tip="Статус домена">Status:</div>
+                                    <div class="whois-value">
+                                        ${whois.statuses.map(s => `<span class="status-badge">${s}</span>`).join(' ')}
+                                    </div>
+                                </div>
+                                ` : ''}
+                                <div class="whois-row">
+                                    <div class="whois-label" data-tip="DNS серверы домена (из WHOIS)">Name Servers (WHOIS):</div>
+                                    <div class="whois-value">
+                                        <div class="ns-list">
+                                            ${whois.name_servers && whois.name_servers.length ? 
+                                                whois.name_servers.map(ns => `<span class="ns-tag">${ns.toLowerCase()}</span>`).join('') : 
+                                                '—'}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="whois-group">
+                            <div class="whois-group-title">Raw Whois Data</div>
+                            <div class="raw-data-container">
+                                <div class="raw-data">${escapeHtml(whois.raw_text)}</div>
+                                <div class="raw-data-toggle">
+                                    <span class="arrow">▼</span>
+                                    <span>Показать полностью</span>
+                                </div>
+                                <div class="blur-hint">🔒 Нажмите, чтобы раскрыть</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+        
+        function renderDNS() {
+            let zonesHtml = '';
+            
+            if (currentData && currentData.dns && currentData.dns.zones && currentData.dns.zones.length > 0) {
+                zonesHtml = `
+                    <div class="whois-group">
+                        <div class="whois-group-title">🌐 NS серверы домена (актуальная делегация)</div>
+                        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 15px;">
+                            Эти NS серверы получены через DNS запрос к корневым серверам. 
+                            Они показывают актуальную делегацию домена в DNS системе.
+                        </div>
+                        <div class="ns-grid">
+                            ${currentData.dns.zones.map(zone => `
+                                <div class="ns-item">
+                                    <div class="ns-server">${zone.server.toLowerCase()}</div>
+                                    <div style="margin-top: 5px; font-size: 12px; ${zone.status.includes('✅') ? 'color: #4caf50;' : (zone.status.includes('❌') ? 'color: #f44336;' : 'color: #ff9800;')}">${zone.status}</div>
+                                    <div style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
+                                        🖥️ Resolves to: ${zone.resolves_to.length ? zone.resolves_to.join(', ') : '—'}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            return `
+                <div class="section">
+                    <div class="section-header" onclick="toggleSection('dns')">
+                        <span>🌐 DNS проверка</span>
+                        <span class="toggle-icon collapsed" id="dns-icon">▼</span>
+                    </div>
+                    <div class="section-content collapsed" id="dns-content">
+                        ${zonesHtml}
+                        
+                        <div class="whois-group">
+                            <div class="whois-group-title">🔍 Проверка DNS записей (27+ серверов по всему миру)</div>
+                            <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 15px;">
+                                ⚠️ Проверка NS записей показывает, какие NS серверы отдают публичные DNS серверы в разных странах. 
+                                При смене NS-серверов распространение может занимать от 3 до 24 часов.
+                            </div>
+                            
+                            <!-- Отдельное поле для ввода домена для DNS проверки -->
+                            <div class="dns-search-box">
+                                <div style="flex: 1;">
+                                    <div class="dns-search-label">🔗 Домен для DNS проверки:</div>
+                                    <input type="text" id="dns-check-domain" placeholder="Введите домен (например, google.com, яндекс.рф)" value="${currentDomain}">
+                                </div>
+                                <button onclick="checkDNSSeparate()" style="align-self: flex-end;">Проверить DNS</button>
+                            </div>
+                            
+                            <div class="record-buttons">
+                                <button class="record-btn" data-type="A">A (IPv4)</button>
+                                <button class="record-btn" data-type="AAAA">AAAA (IPv6)</button>
+                                <button class="record-btn" data-type="MX">MX (Почта)</button>
+                                <button class="record-btn" data-type="TXT">TXT</button>
+                                <button class="record-btn" data-type="CNAME">CNAME</button>
+                                <button class="record-btn active" data-type="NS">NS (Делегация)</button>
+                            </div>
+                            <div id="dns-check-results">
+                                <div class="loading">Выберите тип записи для проверки</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function getTooltipForError(error) {
+            if (error === "Timeout") {
+                return "⏱️ DNS сервер не ответил в течение 5 секунд.\n\nВозможные причины:\n• Сервер находится далеко географически\n• Временные проблемы с сетью\n• Сервер перегружен\n\n✅ Это НЕ означает, что сайт недоступен.\nПросто этот DNS сервер медленно отвечает.";
+            }
+            if (error === "No response") {
+                return "⚠️ DNS сервер не отвечает на запросы.\n\nВозможные причины:\n• Сервер не поддерживает NS запросы\n• Сервер временно недоступен\n• Блокировка на уровне firewall\n\n✅ Это НЕ проблема вашего домена.\nЭто проблема конкретного DNS сервера.";
+            }
+            if (error === "No records") {
+                return "📭 DNS сервер вернул пустой ответ.\n\nВозможные причины:\n• У домена нет записей этого типа\n• Временная проблема сервера\n\n⚠️ Если вы ожидаете записи, проверьте настройки DNS.";
+            }
+            return error;
+        }
+        
+        function getTimeClass(ms) {
+            if (ms < 50) return 'fast';
+            if (ms < 200) return 'medium';
+            return 'slow';
+        }
+        
+        async function checkDNSRecord(recordType) {
+            const resultsDiv = document.getElementById('dns-check-results');
+            if (!resultsDiv) return;
+            
+            // Используем домен из поля DNS проверки или текущий
+            const dnsDomain = document.getElementById('dns-check-domain')?.value.trim() || currentDomain;
+            
+            resultsDiv.innerHTML = '<div class="loading">⏳ Проверка ' + recordType + ' записей...</div>';
+            
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({domain: dnsDomain, record_type: recordType})
+                });
+                
+                if (!response.ok) throw new Error('Ошибка сервера');
+                
+                const data = await response.json();
+                
+                if (!data.dns || !data.dns.checks || !data.dns.checks[recordType] || data.dns.checks[recordType].length === 0) {
+                    resultsDiv.innerHTML = '<div class="error">Нет данных от DNS серверов. Возможно, проблема с сетью.</div>';
+                    return;
+                }
+                
+                const checks = data.dns.checks[recordType];
+                
+                let tableHtml = `
+                    <table class="dns-table">
+                        <thead>
+                            <tr>
+                                <th>DNS Server</th>
+                                <th>Location</th>
+                                <th>Result</th>
+                                <th>Time (ms)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                
+                checks.forEach(check => {
+                    let result = '';
+                    let errorClass = '';
+                    
+                    if (check.error) {
+                        const tooltip = getTooltipForError(check.error);
+                        if (check.error === "Timeout") {
+                            errorClass = 'error-timeout';
+                            result = `<span class="error-cell ${errorClass}" style="cursor: help;">⚠️ Timeout<span class="error-tooltip">${tooltip.replace(/\n/g, '<br>')}</span></span>`;
+                        } else if (check.error === "No response") {
+                            errorClass = 'error-noresponse';
+                            result = `<span class="error-cell ${errorClass}" style="cursor: help;">❌ No response<span class="error-tooltip">${tooltip.replace(/\n/g, '<br>')}</span></span>`;
+                        } else {
+                            errorClass = 'error-norecord';
+                            result = `<span class="error-cell ${errorClass}" style="cursor: help;">⚠️ ${check.error}<span class="error-tooltip">${tooltip.replace(/\n/g, '<br>')}</span></span>`;
+                        }
+                    } else if (check.records.length === 0) {
+                        const tooltip = getTooltipForError("No records");
+                        result = `<span class="error-cell error-norecord" style="cursor: help;">⚠️ No records<span class="error-tooltip">${tooltip.replace(/\n/g, '<br>')}</span></span>`;
+                    } else {
+                        result = check.records.map(r => `<code>${escapeHtml(r)}</code>`).join('<br>');
+                    }
+                    
+                    const timeClass = getTimeClass(check.response_time);
+                    const timeDisplay = check.response_time > 0 ? check.response_time : '—';
+                    const locationParts = check.country.split(',');
+                    const country = locationParts.length > 1 ? locationParts[1].trim() : check.country;
+                    const flagHtml = getFlagHtml(country);
+                    
+                    tableHtml += `
+                        <tr>
+                            <td><strong>${escapeHtml(check.dns_server)}</strong>${flagHtml ? `<span style="margin-left: 6px;">${flagHtml}</span>` : ''}</td>
+                            <td>${escapeHtml(check.country)}</span></td>
+                            <td>${result}</span></td>
+                            <td class="response-time ${timeClass}">${timeDisplay}ms</span></td>
+                        </tr>
+                    `;
+                });
+                
+                tableHtml += `</tbody></table>`;
+                resultsDiv.innerHTML = tableHtml;
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">❌ ${error.message}</div>`;
+            }
+        }
+        
+        function renderServerInfo() {
+    const server = currentData.server;
+    
+    if (!server || !server.ip) {
+        return `
+            <div class="section">
+                <div class="section-header" onclick="toggleSection('server')">
+                    <span>🖥️ Информация о сервере</span>
+                    <span class="toggle-icon" id="server-icon">▼</span>
+                </div>
+                <div class="section-content" id="server-content">
+                    <div class="error">Нет данных о сервере</div>
+                </div>
+            </div>
+        `;
+    }
+    
+    const statusClass = getHttpStatusClass(server.http_status);
+    const statusHtml = server.http_status ? 
+        `<span class="http-status ${statusClass}">${server.http_status} ${server.http_status_text || ''}</span>` : 
+        '<span class="http-status">—</span>';
+    
+    const flagHtml = getFlagHtml(server.country);
+    
+    // Задержка для инициализации карты после рендера
+    setTimeout(() => {
+        if (server.lat && server.lon) {
+            initMap(server.lat, server.lon, server.city, server.country);
+        } else if (server.country) {
+            // Если нет точных координат, показываем карту с центром на стране
+            initMap(null, null, server.city, server.country);
+        }
+    }, 100);
+    
+    return `
+        <div class="section">
+            <div class="section-header" onclick="toggleSection('server')">
+                <span>🖥️ Информация о сервере</span>
+                <span class="toggle-icon" id="server-icon">▼</span>
+            </div>
+            <div class="section-content" id="server-content">
+                <div class="server-info-grid">
+                    <div class="server-info-details">
+                        <div class="whois-list">
+                            <div class="whois-row">
+                                <div class="whois-label" data-tip="IP адрес сервера">IP Address:</div>
+                                <div class="whois-value"><code>${server.ip}</code></div>
+                            </div>
+                            <div class="whois-row">
+                                <div class="whois-label" data-tip="PTR запись">Hostname:</div>
+                                <div class="whois-value">${server.hostname || '—'}</div>
+                            </div>
+                            <div class="whois-row">
+                                <div class="whois-label" data-tip="Провайдер хостинга">Organization / ISP:</div>
+                                <div class="whois-value">${server.org || '—'}</div>
+                            </div>
+                            <div class="whois-row">
+                                <div class="whois-label" data-tip="Страна">Country:</div>
+                                <div class="whois-value">${flagHtml} ${server.country || '—'}</div>
+                            </div>
+                            <div class="whois-row">
+                                <div class="whois-label" data-tip="Регион">Region:</div>
+                                <div class="whois-value">${server.region || '—'}</div>
+                            </div>
+                            <div class="whois-row">
+                                <div class="whois-label" data-tip="Город">City:</div>
+                                <div class="whois-value">${server.city || '—'}</div>
+                            </div>
+                            <div class="whois-row">
+                                <div class="whois-label" data-tip="HTTP статус ответа домена (с учетом редиректов)">HTTP Status:</div>
+                                <div class="whois-value">${statusHtml}</div>
+                            </div>
+                            <div class="whois-row">
+                                <div class="whois-label" data-tip="Веб-сервер">Web Server:</div>
+                                <div class="whois-value">${server.web_server || '—'}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="server-map-container">
+                        <div class="whois-group-title" style="margin-bottom: 10px;">🗺️ Геолокация</div>
+                        <div id="server-map" class="server-map"></div>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 8px; text-align: center;">
+                            ${server.city && server.country ? `${flagHtml} ${server.city}, ${server.country}` : (server.country ? `${flagHtml} ${server.country}` : 'Расположение сервера')}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+        
+        getVisitorInfo();
+        loadTheme();
+        
+        document.getElementById('domain').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') analyzeDomain();
+        });
+    </script>
+</body>
+</html>
